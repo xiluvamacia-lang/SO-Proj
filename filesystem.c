@@ -38,9 +38,15 @@ int absolute_path(const char *path, char *buffer, size_t size){
     free(resolved);
     return 1;
   }
-
   strcpy(buffer, resolved);
 
   free(resolved);
   return 0;
+}
+
+ static int is_conf_file(const struct dirent *entry) {
+  const char *name = entry->d_name;
+  size_t len = strlen(name);
+  
+  return (len > 5 && strcmp(name + len - 5, ".conf") == 0);
 }

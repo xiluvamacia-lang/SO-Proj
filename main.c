@@ -11,12 +11,6 @@
 #include "datacenter.h"
 #include "constants.h"
 
-
-static int filter_conf(const struct dirent *entry) {
-    size_t len = strlen(entry->d_name);
-    return (len > 5 && strcmp(entry->d_name + len - 5, ".conf") == 0);
-}
-
 static void process_conf_file(DataCenter *dc, int fd) {
     int running = 1;
 

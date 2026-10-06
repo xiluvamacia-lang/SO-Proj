@@ -11,11 +11,6 @@
 #include "datacenter.h"
 #include "constants.h"
 
-static int filter_conf(const struct dirent *entry) {
-    size_t len = strlen(entry->d_name);
-    return (len > 5 && strcmp(entry->d_name + len - 5, ".conf") == 0);
-}
-
 static int compare_alpha(const struct dirent **a, const struct dirent **b) {
     return strcmp((*a)->d_name, (*b)->d_name);
 }
@@ -113,7 +108,7 @@ static void process_conf_file(DataCenter *dc, int fd) {
 static int process_conf_files(DataCenter *dc, const char *input_dir) {
     struct dirent **entries = NULL;
 
-    int n = scandir(input_dir, &entries, filter_conf, compare_alpha);
+    int n = scandir(input_dir, &entries, is_conf_file, compare_alpha);
     if (n < 0) {
         perror("scandir");
         return 1;

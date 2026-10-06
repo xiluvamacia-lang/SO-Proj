@@ -132,9 +132,12 @@ int datacenter_execute(DataCenter *dc, const char *reservation_id) {
       VM *vm = res->vms[i];
 
       char vm_dir[MAX_PATH_SIZE];
-      snprintf(vm_dir, sizeof(vm_dir), "%s/%s", res_dir, vm->id);
-      mkdir(vm_dir, 0755);
+       int n = snprintf(vm_dir, sizeof(vm_dir), "/tmp/CloudIST/%s/%s", res->id, vm->id);
 
+      if (n < 0 || (size_t)n >= sizeof(vm_dir)) {
+         fprintf(stderr, "VM path too long.\n");
+         return 1;
+      }
       if (copy_directory_recursive(vm->type->input_folder, vm_dir) != 0) {
           fprintf(stderr, "Failed to copy inputs for VM %s.\n", vm->id);
           return 1;

@@ -35,4 +35,8 @@ int file_exists(const char *path);
  */
 int absolute_path(const char *path, char *buffer, size_t size);
 
+int is_conf_file(const struct dirent *entry);
+
+int copy_directory_recursive(const char *src, const char *dst);
+
 #endif // FILESYSTEM__H

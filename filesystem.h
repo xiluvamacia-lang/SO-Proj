@@ -2,6 +2,7 @@
 #define FILESYSTEM__H
 
 #include <stddef.h>
+#include <dirent.h>
 
 /**
  * Checks whether a path exists and is a directory.

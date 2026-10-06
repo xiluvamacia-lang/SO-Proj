@@ -52,6 +52,36 @@ int is_conf_file(const struct dirent *entry) {
   return (len > 5 && strcmp(name + len - 5, ".conf") == 0);
 }
 
+static int copy_file(const char *src, const char *dst) {
+    int in = open(src, O_RDONLY);
+    if (in < 0) return 1;
+
+    int out = open(dst, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (out < 0) {
+        close(in);
+        return 1;
+    }
+
+    char buf[4096];
+    ssize_t n;
+    while ((n = read(in, buf, sizeof(buf))) > 0) {
+        ssize_t written = 0;
+        while (written < n) {
+            ssize_t w = write(out, buf + written, (size_t)(n - written));
+            if (w <= 0) {
+                close(in);
+                close(out);
+                return 1;
+            }
+            written += w;
+        }
+    }
+
+    close(in);
+    close(out);
+    return (n < 0) ? 1 : 0;
+}
+
 int copy_directory_recursive(const char *src, const char *dst) {
     struct stat st;
     if (stat(src, &st) != 0) return 1;

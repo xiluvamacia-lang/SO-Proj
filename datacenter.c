@@ -5,6 +5,7 @@
 #include <time.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 
 void datacenter_init(DataCenter *dc) {
   dc->servers = NULL;
@@ -120,6 +121,25 @@ int datacenter_execute(DataCenter *dc, const char *reservation_id) {
 
   Reservation *res = find_pending_reservation(dc, reservation_id);
   if (!res) return 1;
+
+  mkdir("/tmp/CloudIST", 0755);
+
+  char res_dir[MAX_PATH_SIZE];
+  snprintf(res_dir, sizeof(res_dir), "/tmp/CloudIST/%s", res->id);
+  mkdir(res_dir, 0755);
+
+  for (size_t i = 0; i < res->num_vms; i++) {
+      VM *vm = res->vms[i];
+
+      char vm_dir[MAX_PATH_SIZE];
+      snprintf(vm_dir, sizeof(vm_dir), "%s/%s", res_dir, vm->id);
+      mkdir(vm_dir, 0755);
+
+      if (copy_directory_recursive(vm->type->input_folder, vm_dir) != 0) {
+          fprintf(stderr, "Failed to copy inputs for VM %s.\n", vm->id);
+          return 1;
+      }
+  }
 
   if (spawn_all_vms(res) != 0) return 1;
 

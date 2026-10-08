@@ -239,18 +239,35 @@ void reservation_destroy(DataCenter *dc, Reservation *reservation) {
 }
 
 void spawn_vm_child(VM *vm) {
-	(void)vm; // To avoid warning.
-
-	// TODO: Limit RAM, DISK and use exec with cpulimit.
-
-	fprintf(stderr, "VM execution not implemented in base version.\n");
+	execl(vm->type->exec_path, vm->type->exec_path, NULL);
+	
+	perror("Failed to execute VM process");
+	exit(EXIT_FAILURE);
 }
+
 
 int spawn_all_vms(Reservation *res) {
 	for (size_t i = 0; i < res->num_vms; i++) {
 		VM *vm = res->vms[i];
 
-		// TODO: Implement fork code. Set VM PID and update VM state to running.
+		pid_t pid = fork();
+
+		switch(pid) {
+			case -1:
+			   perror("fork failed");
+			   return 1;
+
+			case 0:
+			   printf("Spawning VM %s on server %zu\n", vm->id, vm->server->id);
+			   spawn_vm_child(vm);
+			   exit(EXIT_SUCCESS);
+
+			default: 
+			   vm->pid = pid;
+			   vm->state = VM_STATE_RUNNING;
+			   break;
+			
+		}
 
 		spawn_vm_child(vm);
 

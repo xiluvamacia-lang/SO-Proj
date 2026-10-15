@@ -118,4 +118,8 @@ const char *vm_state_to_string(VMState state);
  */
 const char *res_state_to_string(ReservationState state);
 
+
+void reap_finished_vms(DataCenter *dc);
+
+
 #endif // DATACENTER_UTILS__H

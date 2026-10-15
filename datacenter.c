@@ -259,8 +259,3 @@ void datacenter_wait(unsigned int delay_ms){
   struct timespec delay = (struct timespec){delay_ms / 1000, (delay_ms % 1000) * 1000000};
   nanosleep(&delay, NULL);
 }
-
-void datacenter_wait(unsigned int delay_ms){
-  struct timespec delay = (struct timespec){delay_ms / 1000, (delay_ms % 1000) * 1000000};
-  nanosleep(&delay, NULL);
-}

@@ -154,12 +154,6 @@ int datacenter_execute(DataCenter *dc, const char *reservation_id) {
 
   res->state = RES_STATE_RUNNING;
 
-  wait_for_all_vms(res);
-
-  res->state = RES_STATE_FINISHED;
-
-  reservation_destroy(dc, res);
-
   return 0;
 }
 
@@ -259,6 +253,11 @@ int datacenter_list(DataCenter *dc) {
 
   printf("================================================================--------------------------\n\n");
   return 0;
+}
+
+void datacenter_wait(unsigned int delay_ms){
+  struct timespec delay = (struct timespec){delay_ms / 1000, (delay_ms % 1000) * 1000000};
+  nanosleep(&delay, NULL);
 }
 
 void datacenter_wait(unsigned int delay_ms){

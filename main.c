@@ -10,6 +10,7 @@
 #include "parser.h"
 #include "datacenter.h"
 #include "constants.h"
+#include "datacenter_utils.h"
 
 static int compare_alpha(const struct dirent **a, const struct dirent **b) {
     return strcmp((*a)->d_name, (*b)->d_name);
@@ -19,6 +20,8 @@ static void process_conf_file(DataCenter *dc, int fd) {
     int running = 1;
 
     while (running) {
+
+        reap_finished_vms(dc);
         switch (get_next_command(fd)) {
             case CMD_DEFINE: {
                 VMType vmtype;
@@ -116,7 +119,14 @@ static int process_conf_files(DataCenter *dc, const char *input_dir) {
 
     for (int i = 0; i < n; i++) {
         char path[MAX_PATH_SIZE];
-        snprintf(path, sizeof(path), "%s/%s", input_dir, entries[i]->d_name);
+        int written = snprintf(path, sizeof(path),"%s/%s",input_dir,entries[i]->d_name);
+        if (written < 0 || (size_t)written >= sizeof(path)) {
+            fprintf(stderr, "Path too long: %s/%s\n", input_dir, entries[i]->d_name);
+            free(entries[i]);
+            continue;
+        }
+
+
 
         int fd = open(path, O_RDONLY);
         if (fd < 0) {

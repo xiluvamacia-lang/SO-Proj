@@ -16,6 +16,9 @@ void datacenter_init(DataCenter *dc) {
   dc->num_reservations = 0;
 
   dc->configured = 0;
+
+  pthread_mutex_init(&dc->mutex, NULL);
+
 }
 
 void datacenter_destroy(DataCenter *dc) {
@@ -25,6 +28,9 @@ void datacenter_destroy(DataCenter *dc) {
     }
   }
   free(dc->servers);
+
+  pthread_mutex_destroy(&dc->mutex);
+
 }
 
 int datacenter_configure(DataCenter *dc, size_t num_servers, Resources *resources){
@@ -59,67 +65,85 @@ int datacenter_configure(DataCenter *dc, size_t num_servers, Resources *resource
 }
 
 int datacenter_define_VM(DataCenter *dc, VMType *type){
+  pthread_mutex_lock(&dc->mutex);
   if (!dc->configured) {
     fprintf(stderr, "Data Center needs to be configured!\n");
+    pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
   if(VMType_exists(dc, type->id) != NULL){
     fprintf(stderr, "VM type with id %s already exists.\n", type->id);
+    pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
   if (!file_exists(type->exec_path)) {
     fprintf(stderr, "Invalid executable path.\n");
+    pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
   if (!path_exists(type->input_folder)) {
     fprintf(stderr, "Invalid input folder.\n");
+    pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
   if(dc->num_vm_types >= MAX_VM_TYPES){
     fprintf(stderr, "Maximum of VM types reached.\n");
+    pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
   
   dc->vm_types[dc->num_vm_types++] = *type;
 
+  pthread_mutex_unlock(&dc->mutex);
+
   return 0;
 }
 
 int datacenter_reserve(DataCenter *dc, Reservation *reservation) {
+  pthread_mutex_lock(&dc->mutex);
   if (!dc->configured) {
     fprintf(stderr, "Data Center needs to be configured!\n");
+    pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
   if(reservation_validate(dc, reservation) != 0){
+    pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
   if (dc->num_reservations >= MAX_RESERVATIONS){
     fprintf(stderr, "Max number of reservations reached\n");
+    pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
-  if (reservation_commit(dc, reservation) != 0)
+  if (reservation_commit(dc, reservation) != 0){
+    pthread_mutex_unlock(&dc->mutex);
     return 1;
-
+  }
   dc->reservations[dc->num_reservations] = *reservation;
   dc->num_reservations++;
+
+  pthread_mutex_unlock(&dc->mutex);
 
   return 0;
 }
 
 int datacenter_execute(DataCenter *dc, const char *reservation_id) {
+  pthread_mutex_lock(&dc->mutex);
   if(!dc->configured){
     fprintf(stderr, "Data Center needs to be configured!\n");
+    pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
   Reservation *res = find_pending_reservation(dc, reservation_id);
+  pthread_mutex_unlock(&dc->mutex);
   if (!res) return 1;
 
       mkdir("/tmp/CloudIST", 0755);
@@ -128,6 +152,7 @@ int datacenter_execute(DataCenter *dc, const char *reservation_id) {
     int n = snprintf(res_dir, sizeof(res_dir), "/tmp/CloudIST/%s", res->id);
     if (n < 0 || (size_t)n >= sizeof(res_dir)) {
         fprintf(stderr, "Reservation path too long.\n");
+        pthread_mutex_unlock(&dc->mutex);
         return 1;
     }
     mkdir(res_dir, 0755);
@@ -140,12 +165,14 @@ int datacenter_execute(DataCenter *dc, const char *reservation_id) {
 
      if (n < 0 || (size_t)n >= sizeof(vm_dir)) {
         fprintf(stderr, "VM path too long.\n");
+        pthread_mutex_unlock(&dc->mutex);
         return 1;
     }
       mkdir(vm_dir, 0755);
 
       if (copy_directory_recursive(vm->type->input_folder, vm_dir) != 0) {
           fprintf(stderr, "Failed to copy inputs for VM %s.\n", vm->id);
+          pthread_mutex_unlock(&dc->mutex);
           return 1;
       }
   }
@@ -154,12 +181,16 @@ int datacenter_execute(DataCenter *dc, const char *reservation_id) {
 
   res->state = RES_STATE_RUNNING;
 
+  pthread_mutex_unlock(&dc->mutex);
+
   return 0;
 }
 
 int datacenter_list(DataCenter *dc) {
+  pthread_mutex_lock(&dc->mutex);
   if (!dc->configured) {
     fprintf(stderr, "Data Center needs to be configured!\n");
+    pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
@@ -252,6 +283,7 @@ int datacenter_list(DataCenter *dc) {
   }
 
   printf("================================================================--------------------------\n\n");
+  pthread_mutex_unlock(&dc->mutex);
   return 0;
 }
 

@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <sys/types.h>
+#include <pthread.h>
 
 #include "resources.h"
 #include "constants.h"
@@ -29,6 +30,7 @@ typedef struct VM {
   Server *server; // Server where the VM is placed.
   pid_t pid;      // PID of executable file.
   VMState state;  // State of the VM.
+  double cpu_limit;
 } VM;
 
 typedef struct Server {
@@ -75,7 +77,9 @@ typedef struct DataCenter {
 	Reservation reservations[MAX_RESERVATIONS];
     size_t num_reservations;
 
-	int configured;		      // Wheter the datacenter is configured or not.
+	int configured;	            // Wheter the datacenter is configured or not.
+    
+    pthread_mutex_t mutex;
 } DataCenter;
 
 /**

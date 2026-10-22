@@ -216,6 +216,7 @@ static void destroy_vm(Reservation *reservation, size_t index) {
 void reap_finished_vms(DataCenter *dc) {
     int status;
     pid_t pid;
+	pthread_mutex_lock(&dc->mutex);
 
     while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
 
@@ -251,6 +252,7 @@ void reap_finished_vms(DataCenter *dc) {
                 break;
         }
     }
+	pthread_mutex_unlock(&dc->mutex);
 }
 
 void reservation_destroy(DataCenter *dc, Reservation *reservation) {

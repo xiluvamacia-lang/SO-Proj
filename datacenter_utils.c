@@ -380,3 +380,27 @@ const char *res_state_to_string(ReservationState state) {
 			default:                 return "UNKNOWN";
     }
 }
+
+int res_has_running_vms(Reservation *res){
+	for (size_t i = 0; i < res->num_vms; i++) {
+		if (res->vms[i] != NULL && res->vms[i]->state == VM_STATE_RUNNING) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int has_running_vms(DataCenter *dc) {
+	int r = 0;
+	pthread_mutex_lock(&dc->mutex);
+
+	for (size_t i = 0; i < dc->num_reservations; i++) {
+		if (res_has_running_vms(&dc->reservations[i])) {
+			r = 1;
+			break;
+		}
+	}
+
+	pthread_mutex_unlock(&dc->mutex);
+	return r;
+}

@@ -121,5 +121,8 @@ const char *res_state_to_string(ReservationState state);
 
 void reap_finished_vms(DataCenter *dc);
 
+int reservation_has_running_vms(Reservation *res);
+
+int has_running_vms(DataCenter *dc);
 
 #endif // DATACENTER_UTILS__H

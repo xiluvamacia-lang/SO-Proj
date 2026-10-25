@@ -96,8 +96,18 @@ int datacenter_define_VM(DataCenter *dc, VMType *type)
     return 1;
   }
 
-  if (!path_exists(type->input_folder))
+  char absolute_exec[MAX_PATH_SIZE];
+
+  if (absolute_path(type->exec_path, absolute_exec, sizeof(absolute_exec)) != 0)
   {
+    fprintf(stderr, "Failed to resolve absolute path for executable.\n");
+    pthread_mutex_unlock(&dc->mutex);
+    return 1;
+  }
+
+  snprintf(type->exec_path, sizeof(type->exec_path), "%s", absolute_exec);
+
+  if (!path_exists(type->input_folder)) {
     fprintf(stderr, "Invalid input folder.\n");
     pthread_mutex_unlock(&dc->mutex);
     return 1;
@@ -200,13 +210,7 @@ int datacenter_execute(DataCenter *dc, const char *reservation_id) {
 
     char res_dir[MAX_PATH_SIZE];
 
-    n = snprintf(
-        res_dir,
-        sizeof(res_dir),
-        "%s/%s",
-        cloudist_dir,
-        res->id
-    );
+    n = snprintf(res_dir,sizeof(res_dir),"%s/%s",cloudist_dir,res->id);
 
     if (n < 0 || (size_t)n >= sizeof(res_dir)) {
         fprintf(stderr, "Reservation path too long.\n");
@@ -225,13 +229,7 @@ int datacenter_execute(DataCenter *dc, const char *reservation_id) {
 
         char vm_dir[MAX_PATH_SIZE];
 
-        n = snprintf(
-            vm_dir,
-            sizeof(vm_dir),
-            "%s/%s",
-            res_dir,
-            vm->id
-        );
+        n = snprintf(vm_dir,sizeof(vm_dir),"%s/%s", res_dir,vm->id);
 
         if (n < 0 || (size_t)n >= sizeof(vm_dir)) {
             fprintf(stderr, "VM path too long.\n");
@@ -241,6 +239,14 @@ int datacenter_execute(DataCenter *dc, const char *reservation_id) {
 
         if (mkdir(vm_dir, 0755) == -1 && errno != EEXIST) {
             perror("Failed to create VM directory");
+            pthread_mutex_unlock(&dc->mutex);
+            return 1;
+        }
+
+        n = snprintf(vm->work_dir, sizeof(vm->work_dir), "%s", vm_dir);
+
+        if (n < 0 || (size_t)n >= sizeof(vm->work_dir)) {
+            fprintf(stderr, "VM work directory path too long.\n");
             pthread_mutex_unlock(&dc->mutex);
             return 1;
         }

@@ -6,8 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <errno.h>
 
-void datacenter_init(DataCenter *dc) {
+void datacenter_init(DataCenter *dc)
+{
   dc->servers = NULL;
   dc->num_servers = 0;
 
@@ -18,41 +20,47 @@ void datacenter_init(DataCenter *dc) {
   dc->configured = 0;
 
   pthread_mutex_init(&dc->mutex, NULL);
-
 }
 
-void datacenter_destroy(DataCenter *dc) {
-  for (size_t i = 0; i < dc->num_servers; i++) {
-    for(size_t j = 0; j < dc->servers[i].num_hosted_vms; j++){
+void datacenter_destroy(DataCenter *dc)
+{
+  for (size_t i = 0; i < dc->num_servers; i++)
+  {
+    for (size_t j = 0; j < dc->servers[i].num_hosted_vms; j++)
+    {
       free(dc->servers[i].hosted_vms[j]);
     }
   }
   free(dc->servers);
 
   pthread_mutex_destroy(&dc->mutex);
-
 }
 
-int datacenter_configure(DataCenter *dc, size_t num_servers, Resources *resources){
-  if(dc->configured){
+int datacenter_configure(DataCenter *dc, size_t num_servers, Resources *resources)
+{
+  if (dc->configured)
+  {
     fprintf(stderr, "Data Center is already configured!\n");
     return 1;
   }
 
-  if (num_servers == 0 || resources->ram == 0 || resources->disk == 0 || resources->cpu <= 0.0) {
+  if (num_servers == 0 || resources->ram == 0 || resources->disk == 0 || resources->cpu <= 0.0)
+  {
     fprintf(stderr, "Invalid configuration values.\n");
     return 1;
   }
 
-  dc->servers = (Server*)malloc(num_servers*sizeof(Server));
+  dc->servers = (Server *)malloc(num_servers * sizeof(Server));
 
-  if(dc->servers == NULL){
+  if (dc->servers == NULL)
+  {
     fprintf(stderr, "Failed to allocate memory for servers.\n");
     return 1;
   }
 
-  for (size_t i = 0; i < num_servers; i++) {
-    dc->servers[i].id = i+1;
+  for (size_t i = 0; i < num_servers; i++)
+  {
+    dc->servers[i].id = i + 1;
     dc->servers[i].total = *resources;
     dc->servers[i].available = *resources;
     dc->servers[i].num_hosted_vms = 0;
@@ -64,38 +72,44 @@ int datacenter_configure(DataCenter *dc, size_t num_servers, Resources *resource
   return 0;
 }
 
-int datacenter_define_VM(DataCenter *dc, VMType *type){
+int datacenter_define_VM(DataCenter *dc, VMType *type)
+{
   pthread_mutex_lock(&dc->mutex);
-  if (!dc->configured) {
+  if (!dc->configured)
+  {
     fprintf(stderr, "Data Center needs to be configured!\n");
     pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
-  if(VMType_exists(dc, type->id) != NULL){
+  if (VMType_exists(dc, type->id) != NULL)
+  {
     fprintf(stderr, "VM type with id %s already exists.\n", type->id);
     pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
-  if (!file_exists(type->exec_path)) {
+  if (!file_exists(type->exec_path))
+  {
     fprintf(stderr, "Invalid executable path.\n");
     pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
-  if (!path_exists(type->input_folder)) {
+  if (!path_exists(type->input_folder))
+  {
     fprintf(stderr, "Invalid input folder.\n");
     pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
-  if(dc->num_vm_types >= MAX_VM_TYPES){
+  if (dc->num_vm_types >= MAX_VM_TYPES)
+  {
     fprintf(stderr, "Maximum of VM types reached.\n");
     pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
-  
+
   dc->vm_types[dc->num_vm_types++] = *type;
 
   pthread_mutex_unlock(&dc->mutex);
@@ -103,26 +117,31 @@ int datacenter_define_VM(DataCenter *dc, VMType *type){
   return 0;
 }
 
-int datacenter_reserve(DataCenter *dc, Reservation *reservation) {
+int datacenter_reserve(DataCenter *dc, Reservation *reservation)
+{
   pthread_mutex_lock(&dc->mutex);
-  if (!dc->configured) {
+  if (!dc->configured)
+  {
     fprintf(stderr, "Data Center needs to be configured!\n");
     pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
-  if(reservation_validate(dc, reservation) != 0){
+  if (reservation_validate(dc, reservation) != 0)
+  {
     pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
-  if (dc->num_reservations >= MAX_RESERVATIONS){
+  if (dc->num_reservations >= MAX_RESERVATIONS)
+  {
     fprintf(stderr, "Max number of reservations reached\n");
     pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
 
-  if (reservation_commit(dc, reservation) != 0){
+  if (reservation_commit(dc, reservation) != 0)
+  {
     pthread_mutex_unlock(&dc->mutex);
     return 1;
   }
@@ -135,63 +154,121 @@ int datacenter_reserve(DataCenter *dc, Reservation *reservation) {
 }
 
 int datacenter_execute(DataCenter *dc, const char *reservation_id) {
-  pthread_mutex_lock(&dc->mutex);
-  if(!dc->configured){
-    fprintf(stderr, "Data Center needs to be configured!\n");
-    pthread_mutex_unlock(&dc->mutex);
-    return 1;
-  }
+    pthread_mutex_lock(&dc->mutex);
 
-  Reservation *res = find_pending_reservation(dc, reservation_id);
-    if (!res) {
-      fprintf(stderr, "Reservation not found.\n");
-      pthread_mutex_unlock(&dc->mutex);
-      return 1;
+    if (!dc->configured) {
+        fprintf(stderr, "Data Center needs to be configured!\n");
+        pthread_mutex_unlock(&dc->mutex);
+        return 1;
     }
 
-      mkdir("/tmp/CloudIST", 0755);
+    Reservation *res = find_pending_reservation(dc, reservation_id);
+
+    if (!res) {
+        pthread_mutex_unlock(&dc->mutex);
+        return 1;
+    }
+
+    const char *tecnico_id = getenv("USER");
+
+    if (tecnico_id == NULL) {
+        fprintf(stderr, "Could not get Tecnico ID.\n");
+        pthread_mutex_unlock(&dc->mutex);
+        return 1;
+    }
+
+    char cloudist_dir[MAX_PATH_SIZE];
+
+    int n = snprintf(
+        cloudist_dir,
+        sizeof(cloudist_dir),
+        "/tmp/CloudIST-%s",
+        tecnico_id
+    );
+
+    if (n < 0 || (size_t)n >= sizeof(cloudist_dir)) {
+        fprintf(stderr, "CloudIST path too long.\n");
+        pthread_mutex_unlock(&dc->mutex);
+        return 1;
+    }
+
+    if (mkdir(cloudist_dir, 0755) == -1 && errno != EEXIST) {
+        perror("Failed to create CloudIST directory");
+        pthread_mutex_unlock(&dc->mutex);
+        return 1;
+    }
 
     char res_dir[MAX_PATH_SIZE];
-    int n = snprintf(res_dir, sizeof(res_dir), "/tmp/CloudIST/%s", res->id);
+
+    n = snprintf(
+        res_dir,
+        sizeof(res_dir),
+        "%s/%s",
+        cloudist_dir,
+        res->id
+    );
+
     if (n < 0 || (size_t)n >= sizeof(res_dir)) {
         fprintf(stderr, "Reservation path too long.\n");
         pthread_mutex_unlock(&dc->mutex);
         return 1;
     }
-    mkdir(res_dir, 0755);
+
+    if (mkdir(res_dir, 0755) == -1 && errno != EEXIST) {
+        perror("Failed to create reservation directory");
+        pthread_mutex_unlock(&dc->mutex);
+        return 1;
+    }
 
     for (size_t i = 0; i < res->num_vms; i++) {
         VM *vm = res->vms[i];
 
-      char vm_dir[MAX_PATH_SIZE];
-      n = snprintf(vm_dir, sizeof(vm_dir),"/tmp/CloudIST/%s/%s",res->id,vm->id);
+        char vm_dir[MAX_PATH_SIZE];
 
-     if (n < 0 || (size_t)n >= sizeof(vm_dir)) {
-        fprintf(stderr, "VM path too long.\n");
+        n = snprintf(
+            vm_dir,
+            sizeof(vm_dir),
+            "%s/%s",
+            res_dir,
+            vm->id
+        );
+
+        if (n < 0 || (size_t)n >= sizeof(vm_dir)) {
+            fprintf(stderr, "VM path too long.\n");
+            pthread_mutex_unlock(&dc->mutex);
+            return 1;
+        }
+
+        if (mkdir(vm_dir, 0755) == -1 && errno != EEXIST) {
+            perror("Failed to create VM directory");
+            pthread_mutex_unlock(&dc->mutex);
+            return 1;
+        }
+
+        if (copy_directory_recursive(vm->type->input_folder, vm_dir) != 0) {
+            fprintf(stderr, "Failed to copy inputs for VM %s.\n", vm->id);
+            pthread_mutex_unlock(&dc->mutex);
+            return 1;
+        }
+    }
+
+    if (spawn_all_vms(res) != 0) {
         pthread_mutex_unlock(&dc->mutex);
         return 1;
     }
-      mkdir(vm_dir, 0755);
 
-      if (copy_directory_recursive(vm->type->input_folder, vm_dir) != 0) {
-          fprintf(stderr, "Failed to copy inputs for VM %s.\n", vm->id);
-          pthread_mutex_unlock(&dc->mutex);
-          return 1;
-      }
-  }
+    res->state = RES_STATE_RUNNING;
 
-  if (spawn_all_vms(res) != 0) return 1;
+    pthread_mutex_unlock(&dc->mutex);
 
-  res->state = RES_STATE_RUNNING;
-
-  pthread_mutex_unlock(&dc->mutex);
-
-  return 0;
+    return 0;
 }
 
-int datacenter_list(DataCenter *dc) {
+int datacenter_list(DataCenter *dc)
+{
   pthread_mutex_lock(&dc->mutex);
-  if (!dc->configured) {
+  if (!dc->configured)
+  {
     fprintf(stderr, "Data Center needs to be configured!\n");
     pthread_mutex_unlock(&dc->mutex);
     return 1;
@@ -201,7 +278,8 @@ int datacenter_list(DataCenter *dc) {
   printf("\n[ PHYSICAL SERVERS ] (%zu total)\n", dc->num_servers);
   printf("------------------------------------------------------------------------------------------\n");
 
-  for (size_t i = 0; i < dc->num_servers; i++) {
+  for (size_t i = 0; i < dc->num_servers; i++)
+  {
     Server server = dc->servers[i];
 
     Resources used = server.total;
@@ -209,27 +287,32 @@ int datacenter_list(DataCenter *dc) {
 
     printf(" Server #%zu\n", server.id);
     printf("   ├─ Resources Total     : %6.2f vCPUs | %3zu GB RAM | %3zu GB Disk\n",
-            server.total.cpu, server.total.ram, server.total.disk);
+           server.total.cpu, server.total.ram, server.total.disk);
     printf("   ├─ Resources Used      : %6.2f vCPUs | %3zu GB RAM | %3zu GB Disk\n",
-            used.cpu, used.ram, used.disk);
+           used.cpu, used.ram, used.disk);
     printf("   ├─ Resources Available : %6.2f vCPUs | %3zu GB RAM | %3zu GB Disk\n",
-            server.available.cpu, server.available.ram, server.available.disk);
+           server.available.cpu, server.available.ram, server.available.disk);
     printf("   └─ Hosted VMs (%zu):\n", server.num_hosted_vms);
 
-    if (server.num_hosted_vms == 0) {
+    if (server.num_hosted_vms == 0)
+    {
       printf("        (None)\n");
-    } else {
-      for (size_t j = 0; j < server.num_hosted_vms; j++) {
+    }
+    else
+    {
+      for (size_t j = 0; j < server.num_hosted_vms; j++)
+      {
         VM *vm = server.hosted_vms[j];
         const char *prefix = (j == server.num_hosted_vms - 1) ? "└──" : "├──";
 
         printf("        %s VM ID : %-16s | Type: %-10s | State: %-10s",
-                prefix,
-                vm->id,
-                vm->type ? vm->type->id : "Unknown",
-                vm_state_to_string(vm->state));
+               prefix,
+               vm->id,
+               vm->type ? vm->type->id : "Unknown",
+               vm_state_to_string(vm->state));
 
-        if (vm->state == VM_STATE_RUNNING) {
+        if (vm->state == VM_STATE_RUNNING)
+        {
           printf(" | PID: %d", (int)vm->pid);
         }
         printf("\n");
@@ -240,46 +323,59 @@ int datacenter_list(DataCenter *dc) {
 
   printf("[ DEFINED VM TYPES ] (%zu registered)\n", dc->num_vm_types);
   printf("------------------------------------------------------------------------------------------\n");
-  if (dc->num_vm_types == 0) {
+  if (dc->num_vm_types == 0)
+  {
     printf(" (None)\n\n");
-  } else {
-      for (size_t i = 0; i < dc->num_vm_types; i++) {
-        VMType vt = dc->vm_types[i];
-        printf("  * Type ID: %-12s | Requirements: %.2f vCPU, %zu GB RAM, %zu GB Disk\n",
-                vt.id, vt.required.cpu, vt.required.ram, vt.required.disk);
-        printf("    ├─ Executable : %s\n", vt.exec_path);
-        printf("    └─ Input Dir  : %s\n\n", vt.input_folder);
-      }
-      printf("\n");
+  }
+  else
+  {
+    for (size_t i = 0; i < dc->num_vm_types; i++)
+    {
+      VMType vt = dc->vm_types[i];
+      printf("  * Type ID: %-12s | Requirements: %.2f vCPU, %zu GB RAM, %zu GB Disk\n",
+             vt.id, vt.required.cpu, vt.required.ram, vt.required.disk);
+      printf("    ├─ Executable : %s\n", vt.exec_path);
+      printf("    └─ Input Dir  : %s\n\n", vt.input_folder);
+    }
+    printf("\n");
   }
 
   printf("[ RESERVATIONS ] (%zu total)\n", dc->num_reservations);
   printf("------------------------------------------------------------------------------------------\n");
-  if (dc->num_reservations == 0) {
+  if (dc->num_reservations == 0)
+  {
     printf(" (None)\n\n");
-  } else {
-    for (size_t i = 0; i < dc->num_reservations; i++) {
+  }
+  else
+  {
+    for (size_t i = 0; i < dc->num_reservations; i++)
+    {
       Reservation res = dc->reservations[i];
       printf("  * Reservation ID: %-12s | State: %-8s | Total VMs: %zu\n",
-              res.id, res_state_to_string(res.state), res.num_vms);
+             res.id, res_state_to_string(res.state), res.num_vms);
 
       printf("    ├─ Requested Pairs:\n");
-      for (size_t k = 0; k < res.items_count; k++) {
+      for (size_t k = 0; k < res.items_count; k++)
+      {
         printf("    │    • %-12s : %zu unit(s)\n", res.items[k].vm_type_id, res.items[k].amount);
       }
 
       printf("    └─ Allocated VMs:\n");
-      if (res.num_vms == 0) {
+      if (res.num_vms == 0)
+      {
         printf("         (None)\n");
-      } else {
-          for (size_t k = 0; k < res.num_vms; k++) {
-            VM *vm = res.vms[k];
-            const char *prefix = (k == res.num_vms - 1) ? "└──" : "├──";
-            printf("         %s ID: %-15s | Host Server: #%zu\n",
-                    prefix,
-                    vm->id,
-                    vm->server->id);
-          }
+      }
+      else
+      {
+        for (size_t k = 0; k < res.num_vms; k++)
+        {
+          VM *vm = res.vms[k];
+          const char *prefix = (k == res.num_vms - 1) ? "└──" : "├──";
+          printf("         %s ID: %-15s | Host Server: #%zu\n",
+                 prefix,
+                 vm->id,
+                 vm->server->id);
+        }
       }
       printf("\n");
     }
@@ -290,7 +386,8 @@ int datacenter_list(DataCenter *dc) {
   return 0;
 }
 
-void datacenter_wait(unsigned int delay_ms){
+void datacenter_wait(unsigned int delay_ms)
+{
   struct timespec delay = (struct timespec){delay_ms / 1000, (delay_ms % 1000) * 1000000};
   nanosleep(&delay, NULL);
 }

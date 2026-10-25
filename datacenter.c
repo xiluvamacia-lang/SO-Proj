@@ -143,8 +143,11 @@ int datacenter_execute(DataCenter *dc, const char *reservation_id) {
   }
 
   Reservation *res = find_pending_reservation(dc, reservation_id);
-  pthread_mutex_unlock(&dc->mutex);
-  if (!res) return 1;
+    if (!res) {
+      fprintf(stderr, "Reservation not found.\n");
+      pthread_mutex_unlock(&dc->mutex);
+      return 1;
+    }
 
       mkdir("/tmp/CloudIST", 0755);
 

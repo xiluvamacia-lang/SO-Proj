@@ -72,6 +72,11 @@ int main(int argc, char **argv) {
     // Espera que todas as worker threads terminem o seu processamento
     threadpool_wait();
 
+    while (has_running_vms(&dc)){
+        reap_finished_vms(&dc);
+        datacenter_wait(10);
+    }
+
     // Limpeza
     threadpool_destroy();
 

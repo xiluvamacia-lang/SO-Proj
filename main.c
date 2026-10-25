@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 
+
 #include "parser.h"
 #include "datacenter.h"
 #include "constants.h"
@@ -21,14 +22,13 @@ int main(int argc, char **argv) {
     DataCenter dc;
     datacenter_init(&dc);
 
-    if (argc != 7) {
-        fprintf(stderr, "Usage: %s <servers> <ram> <disk> <cpus> <input_dir>\n <max_threads>", argv[0]);
+    if (argc != 8) {
+        fprintf(stderr, "Usage: %s <servers> <ram> <disk> <cpus> <colors> <input_dir>\n <max_threads>", argv[0]);
         return 1;
     }
 
-    size_t servers, ram, disk, max_threads;
-    double cpu;
-    const char *input_dir = argv[5];
+    size_t servers, ram, disk, max_threads; size_t colors; double cpu;
+    const char *input_dir = argv[6];
 
     if (!path_exists(input_dir)) {
         fprintf(stderr, "Invalid input directory.\n");
@@ -39,7 +39,8 @@ int main(int argc, char **argv) {
         parse_size_t_arg(argv[2], &ram) != 0 ||
         parse_size_t_arg(argv[3], &disk) != 0 ||
         parse_double_arg(argv[4], &cpu) != 0 ||
-        parse_size_t_arg(argv[6], &max_threads) != 0 || max_threads == 0) {
+        parse_size_t_arg(argv[5], &colors) != 0 || colors == 0 ||
+        parse_size_t_arg(argv[7], &max_threads) != 0 || max_threads == 0) {
         fprintf(stderr, "Invalid command line arguments.\n");
         return 1;
     }
@@ -50,6 +51,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Failed to configure Data Center.\n");
         return 1;
     }
+
+    dc.colors = colors;
     threadpool_init((int)max_threads, &dc);
 
     // Procura os ficheiros .conf e envia os caminhos para a fila
